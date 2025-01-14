@@ -1,0 +1,217 @@
+openapi: 3.0.3
+info:
+  title: スーパー支払い君.com API
+  description: |
+    法人向け自動支払いサービスのAPI仕様書
+  version: 1.0.0
+security:
+  - BearerAuth: []
+
+paths:
+  /api/invoices:
+    post:
+      summary: 新規請求書データの作成
+      description: |
+        新しい請求書データを作成します。
+        請求金額は支払金額に手数料(4%)とその消費税(10%)を加えて自動計算されます。
+      tags:
+        - invoices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceRequest"
+      responses:
+        "201":
+          description: 請求書データの作成成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: 成功メッセージ
+                    example: "請求書が正常に作成されました。"
+        "400":
+          description: リクエストパラメータが不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 認証エラー
+        "403":
+          description: 権限エラー
+        "500":
+          description: サーバーエラー
+
+    get:
+      summary: 請求書データ一覧の取得
+      description: 指定期間内に支払いが発生する請求書データの一覧を取得します
+      tags:
+        - invoices
+      parameters:
+        - name: start_date
+          in: query
+          description: 検索開始日 (YYYY-MM-DD)
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: 検索終了日 (YYYY-MM-DD)
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          description: ページ番号
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          description: 1ページあたりの表示件数
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: 請求書データ一覧の取得成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceListResponse"
+        "400":
+          description: リクエストパラメータが不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: 認証エラー
+        "403":
+          description: 権限エラー
+        "500":
+          description: サーバーエラー
+
+components:
+  schemas:
+    InvoiceRequest:
+      type: object
+      required:
+        - payment_amount
+        - payment_due_date
+        - partner_id
+      properties:
+        payment_amount:
+          type: integer
+          description: 支払金額
+          example: 10000
+        payment_due_date:
+          type: string
+          format: date
+          description: 支払期日
+          example: "2025-02-01"
+        partner_id:
+          type: string
+          description: 取引先ID
+          example: "partner_123"
+        issue_date:
+          type: string
+          format: date
+          description: 発行日（指定がない場合は現在日付）
+          example: "2025-01-14"
+
+    InvoiceResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: 請求書ID
+        company_id:
+          type: string
+          description: 企業ID
+        partner_id:
+          type: string
+          description: 取引先ID
+        issue_date:
+          type: string
+          format: date
+          description: 発行日
+        payment_amount:
+          type: integer
+          description: 支払金額
+        fee:
+          type: integer
+          description: 手数料
+        fee_rate:
+          type: number
+          format: float
+          description: 手数料率
+        tax:
+          type: integer
+          description: 消費税
+        tax_rate:
+          type: number
+          format: float
+          description: 消費税率
+        total_amount:
+          type: integer
+          description: 請求金額
+        payment_due_date:
+          type: string
+          format: date
+          description: 支払期日
+        status:
+          type: string
+          enum: [pending, processing, completed, error]
+          description: ステータス
+        created_at:
+          type: string
+          format: date-time
+          description: 作成日時
+        updated_at:
+          type: string
+          format: date-time
+          description: 更新日時
+
+    InvoiceListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: 総件数
+        page:
+          type: integer
+          description: 現在のページ番号
+        per_page:
+          type: integer
+          description: 1ページあたりの表示件数
+        invoices:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceResponse"
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          description: エラーコード
+        message:
+          type: string
+          description: エラーメッセージ
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
